@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ملاحظاتي — مساحة خاصة وآمنة لتدوين أفكارك وملاحظاتك، مع حساب شخصي لكل مستخدم.">
+  <meta name="theme-color" content="#0b1428">
+  <title>ملاحظاتي — مساحتك الخاصة</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f5bff'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='white' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <noscript>
+    <div class="noscript-note" role="alert">
+      لا يعمل تطبيق «ملاحظاتي» بدون JavaScript. يرجى تفعيل JavaScript في المتصفح ثم إعادة تحميل الصفحة.
+    </div>
+  </noscript>
+
+  <!-- أيقونات SVG -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="svg-sprite" aria-hidden="true">
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-notes" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.8 2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.8h6V7M6.5 7l.8 13h9.4l.8-13M10 11v5.5M14 11v5.5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5-2-3.4-2.3 1a8.4 8.4 0 0 0-2.6-1.5L14.2 2h-4.4l-.3 3.1a8.4 8.4 0 0 0-2.6 1.5l-2.3-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5 2 3.4 2.3-1a8.4 8.4 0 0 0 2.6 1.5l.3 3.1h4.4l.3-3.1a8.4 8.4 0 0 0 2.6-1.5l2.3 1 2-3.4-2-1.5Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 13.4A8.6 8.6 0 1 1 10.6 3.5a6.9 6.9 0 0 0 9.9 9.9Z"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H9M15 8l4 4-4 4M19 12H9"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3.5h6l-1 6 4 4H6l4-4-1-6ZM12 13.5V21"/></symbol>
+    <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4 10a8 8 0 1 1 2.3 7.3M4 4v6h6"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m14.5 5.5 4 4M4 20l1-5L16.2 3.8a1.7 1.7 0 0 1 2.4 0l1.6 1.6a1.7 1.7 0 0 1 0 2.4L9 19l-5 1Z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10M12 14v2.5"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.1A9.7 9.7 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.4 3.2M6.5 6.8C4 8.5 2.5 12 2.5 12S6 18 12 18a9.6 9.6 0 0 0 3.3-.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.5 3 7.6 7 9.5 4-1.9 7-5 7-9.5V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.5a1.8 1.8 0 0 0 1.4-3l-.4-.5a1.6 1.6 0 0 1 1.2-2.6H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3Z"/><circle cx="7.5" cy="10" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="14.5" cy="7.5" r="1"/><circle cx="17" cy="10.5" r="1"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 20h18.4L12 4Z"/><path d="M12 9v5M12 17.5h.01"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3ZM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14Z"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2.5h6.5A2.5 2.5 0 0 1 21 10v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17V7.5Z"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></symbol>
+    <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6M4 11.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M16 7l2 2M14 9l2 2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  </svg>
+
+  <!-- شاشة الدخول -->
+  <section class="auth-screen" id="authScreen">
+    <div class="auth-brand">
+      <div class="auth-brand-glow auth-brand-glow--one"></div>
+      <div class="auth-brand-glow auth-brand-glow--two"></div>
+
+      <a class="brand brand--light" href="#" aria-label="ملاحظاتي">
+        <span class="brand-mark">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 10.5h14M9 16h10M9 21.5h7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </span>
+        <span class="brand-name">ملاحظاتي</span>
+      </a>
+
+      <div class="auth-brand-content">
+        <span class="brand-eyebrow"><svg class="icon"><use href="#i-sparkles"/></svg> منظم. آمن. خاص.</span>
+        <h1>أفكارك تستحق<br><span>مساحة خاصة.</span></h1>
+        <p class="auth-brand-lead">دوّن أفكارك، نظّم مهامك، وابقَ مطلعًا على ما يهمك — في مكان واحد، خاص بك وحدك.</p>
+
+        <ul class="feature-list">
+          <li>
+            <span class="feature-icon"><svg class="icon"><use href="#i-shield"/></svg></span>
+            <span><strong>خصوصية كاملة</strong><small>لكل مستخدم حساب وملاحظات معزولة تمامًا عن غيره.</small></span>
+          </li>
+          <li>
+            <span class="feature-icon"><svg class="icon"><use href="#i-database"/></svg></span>
+            <span><strong>بياناتك على جهازك</strong><small>تُحفظ محليًا في متصفحك، دون إرسالها إلى أي خادم.</small></span>
+          </li>
+          <li>
+            <span class="feature-icon"><svg class="icon"><use href="#i-sparkles"/></svg></span>
+            <span><strong>تجربة بلا تشتيت</strong><small>واجهة عربية أنيقة تركّز على ما يهم: أفكارك.</small></span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="auth-preview" aria-hidden="true">
+        <div class="preview-card preview-card--back">
+          <span class="preview-dot preview-dot--green"></span>
+          <span class="preview-line preview-line--short"></span>
+          <span class="preview-line"></span>
+          <span class="preview-line preview-line--medium"></span>
+        </div>
+        <div class="preview-card preview-card--front">
+          <div class="preview-card-head">
+            <span class="preview-dot preview-dot--blue"></span>
+            <span class="preview-badge">مثبتة</span>
+          </div>
+          <strong>خطة الربع الثالث</strong>
+          <span class="preview-line"></span>
+          <span class="preview-line preview-line--medium"></span>
+          <div class="preview-checks">
+            <span><svg class="icon"><use href="#i-check"/></svg> مراجعة الأهداف</span>
+            <span><svg class="icon"><use href="#i-check"/></svg> تجهيز العرض</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="auth-brand-footer">© 2026 ملاحظاتي · مساحة تبقى أفكارك فيها في مكانها</div>
+    </div>
+
+    <div class="auth-panel">
+      <div class="auth-panel-inner">
+        <div class="auth-mobile-brand">
+          <span class="brand-mark brand-mark--blue">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 10.5h14M9 16h10M9 21.5h7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </span>
+          <span class="brand-name">ملاحظاتي</span>
+        </div>
+
+        <div class="auth-heading">
+          <span class="eyebrow">مساحة العمل الشخصية</span>
+          <h2 id="authHeading">مرحبًا بعودتك</h2>
+          <p id="authSubheading">سجّل الدخول للوصول إلى ملاحظاتك الخاصة.</p>
+        </div>
+
+        <div class="auth-tabs" role="tablist" aria-label="تسجيل الدخول أو إنشاء حساب">
+          <button class="auth-tab is-active" type="button" role="tab" aria-selected="true" data-auth-tab="login">تسجيل الدخول</button>
+          <button class="auth-tab" type="button" role="tab" aria-selected="false" data-auth-tab="register">إنشاء حساب</button>
+        </div>
+
+        <form class="auth-form" id="loginForm" novalidate>
+          <div class="form-alert" id="loginAlert" role="alert" hidden></div>
+
+          <label class="field" for="loginEmail">
+            <span class="field-label">البريد الإلكتروني</span>
+            <span class="field-control">
+              <svg class="icon field-icon"><use href="#i-mail"/></svg>
+              <input type="email" id="loginEmail" name="email" placeholder="name@company.com" autocomplete="email" dir="ltr" spellcheck="false">
+            </span>
+            <span class="field-error" data-error-for="loginEmail"></span>
+          </label>
+
+          <label class="field" for="loginPassword">
+            <span class="field-label">كلمة المرور</span>
+            <span class="field-control">
+              <svg class="icon field-icon"><use href="#i-lock"/></svg>
+              <input type="password" id="loginPassword" name="password" placeholder="••••••••" autocomplete="current-password" dir="ltr" maxlength="128" data-password-input>
+              <button class="password-toggle" type="button" data-toggle-password="loginPassword" aria-label="إظهار كلمة المرور">
+                <svg class="icon"><use href="#i-eye"/></svg>
+              </button>
+            </span>
+            <span class="field-error" data-error-for="loginPassword"></span>
+          </label>
+
+          <div class="auth-row">
+            <label class="checkbox">
+              <input type="checkbox" id="rememberMe" checked>
+              <span class="checkbox-box"><svg class="icon"><use href="#i-check"/></svg></span>
+              <span>تذكرني على هذا الجهاز</span>
+            </label>
+            <button class="link-btn" type="button" id="forgotBtn">نسيت كلمة المرور؟</button>
+          </div>
+
+          <button class="btn btn-primary btn-block" type="submit" id="loginSubmit">
+            <span>دخول إلى مساحتي</span>
+            <svg class="icon"><use href="#i-arrow-left"/></svg>
+          </button>
+        </form>
+
+        <form class="auth-form" id="registerForm" novalidate hidden>
+          <div class="form-alert" id="registerAlert" role="alert" hidden></div>
+
+          <label class="field" for="registerName">
+            <span class="field-label">الاسم الكامل</span>
+            <span class="field-control">
+              <svg class="icon field-icon"><use href="#i-user"/></svg>
+              <input type="text" id="registerName" name="name" placeholder="مثال: أحمد العتيبي" autocomplete="name" maxlength="60">
+            </span>
+            <span class="field-error" data-error-for="registerName"></span>
+          </label>
+
+          <label class="field" for="registerEmail">
+            <span class="field-label">البريد الإلكتروني</span>
+            <span class="field-control">
+              <svg class="icon field-icon"><use href="#i-mail"/></svg>
+              <input type="email" id="registerEmail" name="email" placeholder="name@company.com" autocomplete="email" dir="ltr" spellcheck="false">
+            </span>
+            <span class="field-error" data-error-for="registerEmail"></span>
+          </label>
+
+          <label class="field" for="registerPassword">
+            <span class="field-label">كلمة المرور</span>
+            <span class="field-control">
+              <svg class="icon field-icon"><use href="#i-lock"/></svg>
+              <input type="password" id="registerPassword" name="password" placeholder="8 أحرف على الأقل" autocomplete="new-password" dir="ltr" maxlength="128" data-password-input>
+              <button class="password-toggle" type="button" data-toggle-password="registerPassword" aria-label="إظهار كلمة المرور">
+                <svg class="icon"><use href="#i-eye"/></svg>
+              </button>
+            </span>
+            <span class="password-strength" id="passwordStrength" aria-live="polite">
+              <span class="strength-bars"><i></i><i></i><i></i><i></i></span>
+              <span class="strength-label">استخدم 8 أحرف على الأقل</span>
+            </span>
+            <span class="field-error" data-error-for="registerPassword"></span>
+          </label>
+
+          <label class="field" for="registerConfirm">
+            <span class="field-label">تأكيد كلمة المرور</span>
+            <span class="field-control">
+              <svg class="icon field-icon"><use href="#i-shield"/></svg>
+              <input type="password" id="registerConfirm" name="confirm" placeholder="أعد كتابة كلمة المرور" autocomplete="new-password" dir="ltr" maxlength="128" data-password-input>
+              <button class="password-toggle" type="button" data-toggle-password="registerConfirm" aria-label="إظهار كلمة المرور">
+                <svg class="icon"><use href="#i-eye"/></svg>
+              </button>
+            </span>
+            <span class="field-error" data-error-for="registerConfirm"></span>
+          </label>
+
+          <button class="btn btn-primary btn-block" type="submit" id="registerSubmit">
+            <span>إنشاء حسابي</span>
+            <svg class="icon"><use href="#i-arrow-left"/></svg>
+          </button>
+
+          <p class="auth-fineprint">بالمتابعة، تُحفظ بياناتك محليًا على هذا الجهاز فقط. يمكنك حذف حسابك وبياناتك في أي وقت من الإعدادات.</p>
+        </form>
+
+        <div class="auth-trust">
+          <svg class="icon"><use href="#i-lock"/></svg>
+          <span>بياناتك تبقى على هذا الجهاز — لا يتم إرسال أي شيء إلى الإنترنت.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- التطبيق -->
+  <div class="app" id="app" hidden>
+    <aside class="sidebar" id="sidebar" aria-label="الشريط الجانبي">
+      <div class="sidebar-head">
+        <a class="brand brand--light" href="#" aria-label="ملاحظاتي">
+          <span class="brand-mark">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 10.5h14M9 16h10M9 21.5h7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </span>
+          <span class="brand-name">ملاحظاتي</span>
+        </a>
+        <button class="icon-btn icon-btn--sidebar" type="button" id="sidebarClose" aria-label="إغلاق القائمة">
+          <svg class="icon"><use href="#i-close"/></svg>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <span class="nav-label">مساحتي</span>
+        <button class="nav-item is-active" type="button" data-view="all" aria-current="page">
+          <svg class="icon"><use href="#i-notes"/></svg>
+          <span>كل الملاحظات</span>
+          <span class="nav-count" id="countAll">0</span>
+        </button>
+        <button class="nav-item" type="button" data-view="favorites">
+          <svg class="icon"><use href="#i-star"/></svg>
+          <span>المفضلة</span>
+          <span class="nav-count" id="countFavorites">0</span>
+        </button>
+        <button class="nav-item" type="button" data-view="trash">
+          <svg class="icon"><use href="#i-trash"/></svg>
+          <span>المهملات</span>
+          <span class="nav-count" id="countTrash">0</span>
+        </button>
+
+        <span class="nav-label nav-label--spaced">الحساب</span>
+        <button class="nav-item" type="button" id="openSettings">
+          <svg class="icon"><use href="#i-settings"/></svg>
+          <span>الإعدادات</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-storage">
+        <div class="storage-head">
+          <span>التخزين المحلي</span>
+          <span id="storageText">0 ك.ب</span>
+        </div>
+        <div class="storage-bar"><span id="storageBar"></span></div>
+        <p>ملاحظاتك محفوظة في هذا المتصفح فقط.</p>
+      </div>
+
+      <div class="sidebar-user">
+        <span class="avatar" id="sidebarAvatar">م</span>
+        <span class="sidebar-user-info">
+          <strong id="sidebarName">مستخدم</strong>
+          <small id="sidebarEmail" dir="ltr">user@example.com</small>
+        </span>
+        <button class="icon-btn icon-btn--sidebar" type="button" id="logoutBtn" aria-label="تسجيل الخروج" title="تسجيل الخروج">
+          <svg class="icon"><use href="#i-logout"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-start">
+          <button class="icon-btn menu-btn" type="button" id="menuBtn" aria-label="فتح القائمة">
+            <svg class="icon"><use href="#i-menu"/></svg>
+          </button>
+
+          <div class="search-box" role="search">
+            <svg class="icon search-icon"><use href="#i-search"/></svg>
+            <input type="search" id="searchInput" placeholder="ابحث في ملاحظاتك..." aria-label="بحث في الملاحظات" autocomplete="off">
+            <button class="search-clear" type="button" id="clearSearch" aria-label="مسح البحث" hidden>
+              <svg class="icon"><use href="#i-close"/></svg>
+            </button>
+            <kbd class="search-kbd">Ctrl K</kbd>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="icon-btn theme-toggle" type="button" id="themeToggle" aria-label="تبديل المظهر" title="تبديل المظهر">
+            <svg class="icon theme-icon theme-icon--moon"><use href="#i-moon"/></svg>
+            <svg class="icon theme-icon theme-icon--sun"><use href="#i-sun"/></svg>
+          </button>
+          <button class="btn btn-primary btn-new-note" type="button" id="newNoteTop">
+            <svg class="icon"><use href="#i-plus"/></svg>
+            <span>ملاحظة جديدة</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="page-head">
+          <div>
+            <span class="eyebrow" id="viewEyebrow">مساحتي</span>
+            <h1 id="viewTitle">كل الملاحظات</h1>
+            <p id="viewSubtitle">كل أفكارك في مكان واحد.</p>
+          </div>
+          <div class="page-stat" id="pageStat">
+            <strong id="visibleCount">0</strong>
+            <span>ملاحظة</span>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="toolbar-start">
+            <span class="toolbar-hint" id="toolbarHint">مرتبة حسب آخر تعديل</span>
+          </div>
+          <div class="toolbar-end">
+            <button class="btn btn-danger-soft" type="button" id="emptyTrashBtn" hidden>
+              <svg class="icon"><use href="#i-trash"/></svg>
+              <span>إفراغ المهملات</span>
+            </button>
+
+            <label class="select-wrap" for="sortSelect">
+              <svg class="icon"><use href="#i-clock"/></svg>
+              <select id="sortSelect" aria-label="ترتيب الملاحظات">
+                <option value="updated">آخر تعديل</option>
+                <option value="created">تاريخ الإنشاء</option>
+                <option value="title">العنوان (أ - ي)</option>
+              </select>
+              <svg class="icon select-chevron"><use href="#i-chevron-down"/></svg>
+            </label>
+
+            <div class="layout-toggle" role="group" aria-label="طريقة العرض">
+              <button class="layout-btn is-active" type="button" data-layout="grid" aria-label="عرض شبكي" aria-pressed="true">
+                <svg class="icon"><use href="#i-grid"/></svg>
+              </button>
+              <button class="layout-btn" type="button" data-layout="list" aria-label="عرض قائمة" aria-pressed="false">
+                <svg class="icon"><use href="#i-list"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <h2 class="sr-only">قائمة الملاحظات</h2>
+        <section class="notes-grid" id="notesGrid" aria-live="polite" aria-label="الملاحظات"></section>
+
+        <div class="empty-state" id="emptyState" hidden>
+          <div class="empty-icon"><svg class="icon"><use href="#i-folder"/></svg></div>
+          <h2 id="emptyTitle">لا توجد ملاحظات بعد</h2>
+          <p id="emptyText">ابدأ بتدوين فكرتك الأولى، وستجدها هنا دائمًا.</p>
+          <button class="btn btn-primary" type="button" id="emptyAction">
+            <svg class="icon"><use href="#i-plus"/></svg>
+            <span>إنشاء ملاحظة</span>
+          </button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- محرر الملاحظة -->
+  <div class="modal" id="editorModal" hidden>
+    <div class="modal-panel editor-panel" role="dialog" aria-modal="true" aria-labelledby="editorHeading">
+      <header class="modal-head">
+        <div>
+          <span class="eyebrow" id="editorKicker">ملاحظة جديدة</span>
+          <h2 id="editorHeading">تدوين فكرة جديدة</h2>
+        </div>
+        <button class="icon-btn" type="button" id="editorClose" aria-label="إغلاق المحرر">
+          <svg class="icon"><use href="#i-close"/></svg>
+        </button>
+      </header>
+
+      <div class="editor-body">
+        <input class="note-title-input" type="text" id="noteTitle" placeholder="عنوان الملاحظة" maxlength="120" aria-label="عنوان الملاحظة">
+        <div class="editor-meta">
+          <span id="noteDate"><svg class="icon"><use href="#i-clock"/></svg><span>الآن</span></span>
+          <span id="noteWords">0 كلمة</span>
+        </div>
+        <textarea class="note-content-input" id="noteContent" placeholder="ابدأ الكتابة... أفكارك، مهامك، وكل ما تريد تذكّره." aria-label="محتوى الملاحظة"></textarea>
+
+        <div class="editor-colors">
+          <span class="editor-colors-label">لون الملاحظة</span>
+          <div class="color-options" id="colorOptions" role="group" aria-label="لون الملاحظة">
+            <button class="color-swatch is-active" type="button" data-color="default" aria-label="افتراضي" aria-pressed="true"><span></span></button>
+            <button class="color-swatch" type="button" data-color="blue" aria-label="أزرق" aria-pressed="false"><span></span></button>
+            <button class="color-swatch" type="button" data-color="green" aria-label="أخضر" aria-pressed="false"><span></span></button>
+            <button class="color-swatch" type="button" data-color="amber" aria-label="كهرماني" aria-pressed="false"><span></span></button>
+            <button class="color-swatch" type="button" data-color="rose" aria-label="وردي" aria-pressed="false"><span></span></button>
+            <button class="color-swatch" type="button" data-color="violet" aria-label="بنفسجي" aria-pressed="false"><span></span></button>
+          </div>
+        </div>
+      </div>
+
+      <footer class="modal-foot editor-foot">
+        <div class="editor-toggles">
+          <button class="chip-toggle" type="button" id="pinToggle" aria-pressed="false">
+            <svg class="icon"><use href="#i-pin"/></svg>
+            <span>تثبيت</span>
+          </button>
+          <button class="chip-toggle" type="button" id="favoriteToggle" aria-pressed="false">
+            <svg class="icon"><use href="#i-star"/></svg>
+            <span>مفضلة</span>
+          </button>
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-danger-ghost" type="button" id="deleteNoteBtn" hidden>
+            <svg class="icon"><use href="#i-trash"/></svg>
+            <span>حذف</span>
+          </button>
+          <button class="btn btn-ghost" type="button" id="cancelEdit">إلغاء</button>
+          <button class="btn btn-primary" type="button" id="saveNote">
+            <svg class="icon"><use href="#i-check"/></svg>
+            <span>حفظ الملاحظة</span>
+          </button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- الإعدادات -->
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-panel settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsHeading">
+      <header class="modal-head">
+        <div>
+          <span class="eyebrow">إدارة حسابك</span>
+          <h2 id="settingsHeading">الإعدادات</h2>
+        </div>
+        <button class="icon-btn" type="button" id="settingsClose" aria-label="إغلاق الإعدادات">
+          <svg class="icon"><use href="#i-close"/></svg>
+        </button>
+      </header>
+
+      <div class="settings-body">
+        <section class="settings-section">
+          <div class="settings-section-head">
+            <span class="settings-icon"><svg class="icon"><use href="#i-user"/></svg></span>
+            <div><h3>الملف الشخصي</h3><p>الاسم الذي يظهر داخل مساحتك.</p></div>
+          </div>
+          <div class="settings-grid">
+            <label class="field" for="profileName">
+              <span class="field-label">الاسم الكامل</span>
+              <span class="field-control"><input type="text" id="profileName" maxlength="60"></span>
+            </label>
+            <label class="field" for="profileEmail">
+              <span class="field-label">البريد الإلكتروني</span>
+              <span class="field-control field-control--disabled"><input type="email" id="profileEmail" dir="ltr" disabled></span>
+            </label>
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" id="saveProfile">حفظ التغييرات</button>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-head">
+            <span class="settings-icon"><svg class="icon"><use href="#i-key"/></svg></span>
+            <div><h3>الأمان</h3><p>تغيير كلمة المرور الخاصة بحسابك.</p></div>
+          </div>
+          <div class="settings-grid settings-grid--three">
+            <label class="field" for="currentPassword">
+              <span class="field-label">كلمة المرور الحالية</span>
+              <span class="field-control"><input type="password" id="currentPassword" autocomplete="current-password" dir="ltr" maxlength="128" data-password-input></span>
+            </label>
+            <label class="field" for="newPassword">
+              <span class="field-label">كلمة المرور الجديدة</span>
+              <span class="field-control"><input type="password" id="newPassword" autocomplete="new-password" dir="ltr" maxlength="128" data-password-input></span>
+            </label>
+            <label class="field" for="confirmPassword">
+              <span class="field-label">تأكيد كلمة المرور</span>
+              <span class="field-control"><input type="password" id="confirmPassword" autocomplete="new-password" dir="ltr" maxlength="128" data-password-input></span>
+            </label>
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" id="updatePassword">تحديث كلمة المرور</button>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-head">
+            <span class="settings-icon"><svg class="icon"><use href="#i-palette"/></svg></span>
+            <div><h3>المظهر</h3><p>اختر المظهر الأنسب لك.</p></div>
+          </div>
+          <div class="theme-options" role="group" aria-label="المظهر">
+            <button class="theme-option" type="button" data-theme-choice="light">
+              <span class="theme-swatch theme-swatch--light"></span>
+              <span>فاتح</span>
+              <svg class="icon theme-check"><use href="#i-check"/></svg>
+            </button>
+            <button class="theme-option" type="button" data-theme-choice="dark">
+              <span class="theme-swatch theme-swatch--dark"></span>
+              <span>داكن</span>
+              <svg class="icon theme-check"><use href="#i-check"/></svg>
+            </button>
+            <button class="theme-option" type="button" data-theme-choice="system">
+              <span class="theme-swatch theme-swatch--system"></span>
+              <span>النظام</span>
+              <svg class="icon theme-check"><use href="#i-check"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-head">
+            <span class="settings-icon"><svg class="icon"><use href="#i-database"/></svg></span>
+            <div><h3>البيانات</h3><p>احتفظ بنسخة من ملاحظاتك أو أفرغ مساحتك.</p></div>
+          </div>
+          <div class="settings-actions">
+            <button class="btn btn-secondary btn-sm" type="button" id="exportNotes">
+              <svg class="icon"><use href="#i-download"/></svg>
+              <span>تصدير الملاحظات</span>
+            </button>
+            <button class="btn btn-danger-soft btn-sm" type="button" id="deleteAllNotes">
+              <svg class="icon"><use href="#i-trash"/></svg>
+              <span>حذف كل الملاحظات</span>
+            </button>
+          </div>
+          <p class="settings-note"><svg class="icon"><use href="#i-info"/></svg> يتم تصدير الملاحظات كملف JSON يمكنك الاحتفاظ به.</p>
+        </section>
+
+        <section class="settings-section settings-section--danger">
+          <div class="settings-section-head">
+            <span class="settings-icon"><svg class="icon"><use href="#i-alert"/></svg></span>
+            <div><h3>حذف الحساب</h3><p>حذف حسابك وكل ملاحظاتك نهائيًا من هذا الجهاز.</p></div>
+          </div>
+          <button class="btn btn-danger btn-sm" type="button" id="deleteAccount">حذف حسابي نهائيًا</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- نافذة التأكيد -->
+  <div class="modal" id="confirmModal" hidden>
+    <div class="modal-panel confirm-panel" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+      <span class="confirm-icon" id="confirmIcon"><svg class="icon"><use href="#i-alert"/></svg></span>
+      <h2 id="confirmTitle">هل أنت متأكد؟</h2>
+      <p id="confirmMessage">لا يمكن التراجع عن هذا الإجراء.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" type="button" id="confirmCancel">إلغاء</button>
+        <button class="btn btn-danger" type="button" id="confirmOk">تأكيد</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
