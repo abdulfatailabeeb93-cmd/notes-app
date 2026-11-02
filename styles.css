@@ -902,6 +902,10 @@ svg.icon {
   margin-top: -2px;
 }
 
+.auth-row--end {
+  justify-content: flex-end;
+}
+
 .checkbox {
   position: relative;
   display: inline-flex;

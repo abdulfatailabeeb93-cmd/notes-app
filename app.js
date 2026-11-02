@@ -1,24 +1,33 @@
 /* ============================================================
    ملاحظاتي — منطق التطبيق
-   قاعدة بيانات محلية (localStorage) + حساب مستقل لكل مستخدم
+   Supabase Auth + قاعدة بيانات Supabase مع حماية RLS
    ============================================================ */
 
 (() => {
   'use strict';
 
+  /* ---------- إعداد Supabase ---------- */
+
+  const SUPABASE_URL = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) || '';
+  const SUPABASE_ANON_KEY = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || '';
+
+  // المفتاح العام (anon/publishable) فقط. لا تضع service_role هنا أبدًا.
+  const supabaseClient = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
+    : null;
+
   /* ---------- الثوابت ---------- */
 
   const STORAGE = {
-    users: 'mulahazati.users.v1',
-    session: 'mulahazati.session.v1',
-    notes: (userId) => `mulahazati.notes.v1.${userId}`,
     theme: 'mulahazati.theme.v1',
     layout: 'mulahazati.layout.v1'
   };
-
-  const SESSION_REMEMBER_MS = 30 * 24 * 60 * 60 * 1000; // 30 يومًا
-  const SESSION_TAB_MS = 12 * 60 * 60 * 1000;          // 12 ساعة
-  const STORAGE_LIMIT = 5 * 1024 * 1024;               // تقدير 5 م.ب
 
   const NOTE_COLORS = ['default', 'blue', 'green', 'amber', 'rose', 'violet'];
 
@@ -49,7 +58,6 @@
   /* ---------- الحالة ---------- */
 
   const state = {
-    users: [],
     user: null,
     notes: [],
     view: 'all',
@@ -64,7 +72,9 @@
     editorFavorite: false,
     editorSnapshot: '',
     confirmCallback: null,
-    searchTimer: null
+    searchTimer: null,
+    notesLoading: false,
+    recoveryMode: false
   };
 
   let els = {};
@@ -84,30 +94,6 @@
     }[char]));
   }
 
-  function readJSON(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (error) {
-      console.warn('تعذر قراءة البيانات المحلية:', error);
-      return fallback;
-    }
-  }
-
-  function writeJSON(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (error) {
-      console.error('تعذر حفظ البيانات المحلية:', error);
-      return false;
-    }
-  }
-
-  function getNotesKey(userId) {
-    return STORAGE.notes(userId);
-  }
-
   function normalizeEmail(email) {
     return String(email || '').trim().toLowerCase();
   }
@@ -118,13 +104,6 @@
 
   function collapseSpaces(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
-  }
-
-  function formatBytes(bytes) {
-    if (!Number.isFinite(bytes) || bytes <= 0) return '0 ك.ب';
-    if (bytes < 1024) return `${bytes} بايت`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} ك.ب`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} م.ب`;
   }
 
   function relativeTime(timestamp) {
@@ -199,168 +178,7 @@
       .trim();
   }
 
-  /* ---------- تشفير كلمات المرور ---------- */
-
-  function bytesToHex(bytes) {
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  function hexToBytes(hex) {
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let index = 0; index < bytes.length; index += 1) {
-      bytes[index] = parseInt(hex.slice(index * 2, index * 2 + 2), 16);
-    }
-    return bytes;
-  }
-
-  function randomHex(length = 16) {
-    const bytes = new Uint8Array(length);
-    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
-      window.crypto.getRandomValues(bytes);
-    } else {
-      for (let index = 0; index < bytes.length; index += 1) {
-        bytes[index] = Math.floor(Math.random() * 256);
-      }
-    }
-    return bytesToHex(bytes);
-  }
-
-  function uuid() {
-    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-      return window.crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
-      const random = Math.floor(Math.random() * 16);
-      const value = char === 'x' ? random : ((random & 0x3) | 0x8);
-      return value.toString(16);
-    });
-  }
-
-  function utf8String(value) {
-    const bytes = new TextEncoder().encode(String(value));
-    let output = '';
-    for (const byte of bytes) output += String.fromCharCode(byte);
-    return output;
-  }
-
-  // تطبيق SHA-256 احتياطي للمتصفحات التي لا تدعم Web Crypto
-  function sha256Fallback(ascii) {
-    const rightRotate = (value, amount) => (value >>> amount) | (value << (32 - amount));
-    const maxWord = 2 ** 32;
-    let result = '';
-    const words = [];
-    const asciiBitLength = ascii.length * 8;
-    const constants = sha256Fallback.h = sha256Fallback.h || [];
-    const k = sha256Fallback.k = sha256Fallback.k || [];
-    let primeCounter = constants.length;
-    const isComposite = {};
-
-    for (let candidate = 2; primeCounter < 64; candidate += 1) {
-      if (!isComposite[candidate]) {
-        for (let multiple = 0; multiple < 313; multiple += candidate) {
-          isComposite[multiple] = candidate;
-        }
-        constants[primeCounter] = (Math.pow(candidate, 0.5) * maxWord) | 0;
-        k[primeCounter] = (Math.pow(candidate, 1 / 3) * maxWord) | 0;
-        primeCounter += 1;
-      }
-    }
-
-    ascii += '\x80';
-    while (ascii.length % 64 !== 56) ascii += '\x00';
-
-    for (let index = 0; index < ascii.length; index += 1) {
-      const code = ascii.charCodeAt(index);
-      if (code >> 8) return '';
-      words[index >> 2] |= code << (((3 - index) % 4) * 8);
-    }
-
-    words[words.length] = (asciiBitLength / maxWord) | 0;
-    words[words.length] = asciiBitLength;
-
-    let hash = constants.slice(0, 8);
-
-    for (let blockStart = 0; blockStart < words.length;) {
-      const w = words.slice(blockStart, (blockStart += 16));
-      const oldHash = hash.slice(0, 8);
-      const working = hash.slice(0, 8);
-
-      for (let index = 0; index < 64; index += 1) {
-        const w15 = w[index - 15];
-        const w2 = w[index - 2];
-        const a = working[0];
-        const e = working[4];
-
-        const temp1 = (
-          working[7] +
-          (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) +
-          ((e & working[5]) ^ (~e & working[6])) +
-          k[index] +
-          (w[index] = index < 16
-            ? w[index]
-            : (
-              w[index - 16] +
-              (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) +
-              w[index - 7] +
-              (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))
-            ) | 0)
-        ) | 0;
-
-        const temp2 = (
-          (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) +
-          ((a & working[1]) ^ (a & working[2]) ^ (working[1] & working[2]))
-        ) | 0;
-
-        working.unshift((temp1 + temp2) | 0);
-        working[4] = (working[4] + temp1) | 0;
-        working.length = 8;
-      }
-
-      hash = working.map((value, index) => (value + oldHash[index]) | 0);
-    }
-
-    for (let index = 0; index < 8; index += 1) {
-      for (let byteIndex = 3; byteIndex >= 0; byteIndex -= 1) {
-        const byte = (hash[index] >> (byteIndex * 8)) & 255;
-        result += (byte < 16 ? '0' : '') + byte.toString(16);
-      }
-    }
-
-    return result;
-  }
-
-  async function hashPassword(password, saltHex) {
-    if (window.crypto && window.crypto.subtle && typeof window.crypto.subtle.importKey === 'function') {
-      try {
-        const key = await window.crypto.subtle.importKey(
-          'raw',
-          new TextEncoder().encode(password),
-          { name: 'PBKDF2' },
-          false,
-          ['deriveBits']
-        );
-        const bits = await window.crypto.subtle.deriveBits(
-          {
-            name: 'PBKDF2',
-            salt: hexToBytes(saltHex),
-            iterations: 120000,
-            hash: 'SHA-256'
-          },
-          key,
-          256
-        );
-        return bytesToHex(new Uint8Array(bits));
-      } catch (error) {
-        console.warn('تعذر استخدام Web Crypto، سيتم استخدام التشفير الاحتياطي.', error);
-      }
-    }
-
-    let digest = sha256Fallback(utf8String(`${saltHex}:${password}`));
-    for (let round = 0; round < 2500; round += 1) {
-      digest = sha256Fallback(utf8String(`${digest}:${saltHex}`));
-    }
-    return digest;
-  }
+  /* ---------- قوة كلمة المرور ---------- */
 
   function scorePassword(password) {
     if (!password) return 0;
@@ -380,120 +198,134 @@
     return 'كلمة مرور قوية';
   }
 
-  /* ---------- الجلسة والمستخدمون ---------- */
+  /* ---------- مستخدم Supabase وملاحظاته ---------- */
 
-  function loadUsers() {
-    const users = readJSON(STORAGE.users, []);
-    state.users = Array.isArray(users)
-      ? users.filter((user) => (
-        user
-        && typeof user.id === 'string'
-        && typeof user.email === 'string'
-        && typeof user.salt === 'string'
-        && typeof user.passwordHash === 'string'
-      ))
-      : [];
-  }
-
-  function saveUsers() {
-    return writeJSON(STORAGE.users, state.users);
-  }
-
-  function setSession(userId, remember) {
-    clearSession();
-    const session = {
-      userId,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + (remember ? SESSION_REMEMBER_MS : SESSION_TAB_MS)
+  function mapUser(user) {
+    if (!user) return null;
+    const metadata = user.user_metadata || {};
+    const fallbackName = String(user.email || '').split('@')[0] || 'مستخدم';
+    return {
+      id: user.id,
+      email: user.email || '',
+      name: collapseSpaces(metadata.full_name || metadata.name || '') || fallbackName
     };
-    try {
-      const store = remember ? localStorage : sessionStorage;
-      store.setItem(STORAGE.session, JSON.stringify(session));
-    } catch (error) {
-      console.error('تعذر إنشاء الجلسة:', error);
-    }
   }
 
-  function readSession() {
-    const stores = [];
+  function mapNoteRow(row) {
+    const created = Date.parse(row.created_at);
+    const updated = Date.parse(row.updated_at);
+    const deleted = row.deleted_at ? Date.parse(row.deleted_at) : null;
 
-    // الوصول إلى التخزين قد يفشل في المتصفحات التي تمنع التخزين المحلي
-    try {
-      if (window.sessionStorage) stores.push(window.sessionStorage);
-    } catch (error) {
-      // تجاهل
+    return {
+      id: row.id,
+      title: typeof row.title === 'string' ? row.title : '',
+      content: typeof row.content === 'string' ? row.content : '',
+      color: NOTE_COLORS.includes(row.color) ? row.color : 'default',
+      pinned: Boolean(row.pinned),
+      favorite: Boolean(row.favorite),
+      trashed: Boolean(row.trashed),
+      createdAt: Number.isFinite(created) ? created : Date.now(),
+      updatedAt: Number.isFinite(updated) ? updated : (Number.isFinite(created) ? created : Date.now()),
+      deletedAt: Number.isFinite(deleted) ? deleted : null
+    };
+  }
+
+  function authErrorMessage(error) {
+    const message = String(error && error.message ? error.message : '');
+    if (/invalid login credentials/i.test(message)) return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+    if (/email not confirmed/i.test(message)) return 'يرجى تأكيد بريدك الإلكتروني أولًا ثم تسجيل الدخول.';
+    if (/user already registered/i.test(message)) return 'يوجد حساب مسجل بهذا البريد الإلكتروني بالفعل.';
+    if (/password should be at least/i.test(message)) return 'كلمة المرور قصيرة جدًا. استخدم 8 أحرف على الأقل.';
+    if (/rate limit|too many requests/i.test(message)) return 'محاولات كثيرة جدًا. انتظر قليلًا ثم حاول مجددًا.';
+    if (/failed to fetch|network|fetch/i.test(message)) return 'تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت.';
+    if (/signup is disabled/i.test(message)) return 'إنشاء الحسابات غير مفعّل حاليًا.';
+    return 'حدث خطأ غير متوقع. حاول مرة أخرى.';
+  }
+
+  function reportSupabaseError(error, fallback = 'تعذر إكمال العملية. حاول مرة أخرى.') {
+    console.error(error);
+    const message = String(error && error.message ? error.message : '');
+    if (/jwt expired|invalid claim|not authenticated|session missing|auth session/i.test(message)) {
+      toast('انتهت جلستك. يرجى تسجيل الدخول مجددًا.', 'error', 5000);
+      void logout();
+      return;
     }
+    toast(fallback, 'error', 5000);
+  }
+
+  async function fetchNotes() {
+    if (!supabaseClient || !state.user) return [];
 
     try {
-      if (window.localStorage) stores.push(window.localStorage);
-    } catch (error) {
-      // تجاهل
-    }
+      const { data, error } = await supabaseClient
+        .from('notes')
+        .select('*')
+        .eq('user_id', state.user.id)
+        .order('updated_at', { ascending: false });
 
-    for (const store of stores) {
-      try {
-        const raw = store.getItem(STORAGE.session);
-        if (!raw) continue;
-        const session = JSON.parse(raw);
-        if (!session || !session.userId) {
-          store.removeItem(STORAGE.session);
-          continue;
-        }
-        if (session.expiresAt && session.expiresAt < Date.now()) {
-          store.removeItem(STORAGE.session);
-          continue;
-        }
-        return session;
-      } catch (error) {
-        // تجاهل الجلسات التالفة
+      if (error) {
+        reportSupabaseError(error, 'تعذر تحميل الملاحظات من الخادم.');
+        return [];
       }
-    }
-    return null;
-  }
 
-  function clearSession() {
-    try {
-      sessionStorage.removeItem(STORAGE.session);
+      return (data || []).map(mapNoteRow);
     } catch (error) {
-      // تجاهل
+      reportSupabaseError(error, 'تعذر تحميل الملاحظات من الخادم.');
+      return [];
     }
+  }
+
+  async function updateNoteRecord(noteId, patch, message, type = 'success') {
+    if (!supabaseClient || !state.user) return false;
 
     try {
-      localStorage.removeItem(STORAGE.session);
+      const { data, error } = await supabaseClient
+        .from('notes')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', noteId)
+        .eq('user_id', state.user.id)
+        .select()
+        .single();
+
+      if (error) {
+        reportSupabaseError(error, 'تعذر تحديث الملاحظة.');
+        return false;
+      }
+
+      const updatedNote = mapNoteRow(data);
+      const index = state.notes.findIndex((note) => note.id === noteId);
+      if (index >= 0) state.notes[index] = updatedNote;
+      renderAll();
+      if (message) toast(message, type, 2400);
+      return true;
     } catch (error) {
-      // تجاهل
-    }
-  }
-
-  function loadNotes(userId) {
-    const notes = readJSON(getNotesKey(userId), []);
-    if (!Array.isArray(notes)) return [];
-
-    return notes
-      .filter((note) => note && typeof note === 'object')
-      .map((note) => ({
-        id: typeof note.id === 'string' ? note.id : uuid(),
-        title: typeof note.title === 'string' ? note.title : '',
-        content: typeof note.content === 'string' ? note.content : '',
-        color: NOTE_COLORS.includes(note.color) ? note.color : 'default',
-        pinned: Boolean(note.pinned),
-        favorite: Boolean(note.favorite),
-        trashed: Boolean(note.trashed),
-        createdAt: Number(note.createdAt) || Date.now(),
-        updatedAt: Number(note.updatedAt) || Number(note.createdAt) || Date.now(),
-        deletedAt: note.deletedAt ? Number(note.deletedAt) : null
-      }));
-  }
-
-  function persistNotes() {
-    if (!state.user) return false;
-    const saved = writeJSON(getNotesKey(state.user.id), state.notes);
-    if (!saved) {
-      toast('تعذر حفظ الملاحظات. قد تكون مساحة التخزين ممتلئة.', 'error', 5000);
+      reportSupabaseError(error, 'تعذر تحديث الملاحظة.');
       return false;
     }
-    updateStorageMeter();
-    return true;
+  }
+
+  async function deleteNoteRecord(noteId) {
+    if (!supabaseClient || !state.user) return false;
+
+    try {
+      const { error } = await supabaseClient
+        .from('notes')
+        .delete()
+        .eq('id', noteId)
+        .eq('user_id', state.user.id);
+
+      if (error) {
+        reportSupabaseError(error, 'تعذر حذف الملاحظة.');
+        return false;
+      }
+
+      state.notes = state.notes.filter((note) => note.id !== noteId);
+      renderAll();
+      return true;
+    } catch (error) {
+      reportSupabaseError(error, 'تعذر حذف الملاحظة.');
+      return false;
+    }
   }
 
   function findNote(noteId) {
@@ -685,31 +517,32 @@
 
     if (!valid) return;
 
+    if (!supabaseClient) {
+      showAlert(els.loginAlert, 'اتصال Supabase غير مهيأ. تحقق من ملف supabase-config.js.');
+      return;
+    }
+
     setButtonLoading(els.loginSubmit, true, 'جارٍ تسجيل الدخول...');
 
     try {
-      const user = state.users.find((item) => item.email === email);
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
-      if (!user) {
-        showAlert(els.loginAlert, 'البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+      if (error) {
+        showAlert(els.loginAlert, authErrorMessage(error));
         els.loginPassword.value = '';
         els.loginPassword.focus();
         return;
       }
 
-      const passwordHash = await hashPassword(password, user.salt);
-      if (passwordHash !== user.passwordHash) {
-        showAlert(els.loginAlert, 'البريد الإلكتروني أو كلمة المرور غير صحيحة.');
-        els.loginPassword.value = '';
-        els.loginPassword.focus();
+      if (!data.user) {
+        showAlert(els.loginAlert, 'تعذر إكمال تسجيل الدخول. حاول مرة أخرى.');
         return;
       }
 
-      setSession(user.id, els.rememberMe.checked);
-      state.user = user;
-      state.notes = loadNotes(user.id);
-      enterApp();
-      toast(`مرحبًا بعودتك، ${user.name.split(/\s+/)[0] || 'صديقنا'}.`, 'success');
+      await enterApp(data.user);
+      if (state.user) {
+        toast(`مرحبًا بعودتك، ${state.user.name.split(/\s+/)[0] || 'صديقنا'}.`, 'success');
+      }
     } catch (error) {
       console.error(error);
       showAlert(els.loginAlert, 'حدث خطأ غير متوقع أثناء تسجيل الدخول. حاول مرة أخرى.');
@@ -740,9 +573,6 @@
     } else if (!isValidEmail(email)) {
       setFieldError(els.registerEmail, 'صيغة البريد الإلكتروني غير صحيحة.');
       valid = false;
-    } else if (state.users.some((user) => user.email === email)) {
-      setFieldError(els.registerEmail, 'يوجد حساب مسجل بهذا البريد الإلكتروني بالفعل.');
-      valid = false;
     }
 
     if (password.length < 8) {
@@ -760,35 +590,41 @@
 
     if (!valid) return;
 
+    if (!supabaseClient) {
+      showAlert(els.registerAlert, 'اتصال Supabase غير مهيأ. تحقق من ملف supabase-config.js.');
+      return;
+    }
+
     setButtonLoading(els.registerSubmit, true, 'جارٍ إنشاء الحساب...');
 
     try {
-      const salt = randomHex(16);
-      const passwordHash = await hashPassword(password, salt);
-
-      const user = {
-        id: uuid(),
-        name,
+      const { data, error } = await supabaseClient.auth.signUp({
         email,
-        salt,
-        passwordHash,
-        createdAt: Date.now()
-      };
+        password,
+        options: { data: { full_name: name } }
+      });
 
-      state.users.push(user);
-      if (!saveUsers()) {
-        state.users.pop();
-        showAlert(els.registerAlert, 'تعذر حفظ الحساب على هذا الجهاز. تحقق من إعدادات التخزين في المتصفح.');
+      if (error) {
+        showAlert(els.registerAlert, authErrorMessage(error));
         return;
       }
 
-      state.user = user;
-      state.notes = [];
-      setSession(user.id, true);
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setFieldError(els.registerEmail, 'يوجد حساب مسجل بهذا البريد الإلكتروني بالفعل.');
+        return;
+      }
+
+      if (data.session && data.user) {
+        await enterApp(data.user);
+        toast(`تم إنشاء حسابك بنجاح، مرحبًا ${state.user.name.split(/\s+/)[0]}.`, 'success', 4500);
+        return;
+      }
+
       els.registerForm.reset();
       updatePasswordStrength('');
-      enterApp();
-      toast(`تم إنشاء حسابك بنجاح، مرحبًا ${name.split(/\s+/)[0]}.`, 'success', 4500);
+      setAuthMode('login');
+      showAlert(els.loginAlert, 'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتأكيد الحساب ثم سجّل الدخول.');
+      toast('تحقق من بريدك الإلكتروني لإكمال إنشاء الحساب.', 'info', 6500);
     } catch (error) {
       console.error(error);
       showAlert(els.registerAlert, 'حدث خطأ غير متوقع أثناء إنشاء الحساب. حاول مرة أخرى.');
@@ -797,14 +633,54 @@
     }
   }
 
+  async function handleForgotPassword() {
+    if (!supabaseClient) {
+      toast('اتصال Supabase غير مهيأ. تحقق من ملف supabase-config.js.', 'error');
+      return;
+    }
+
+    const email = normalizeEmail(els.loginEmail.value);
+    if (!email || !isValidEmail(email)) {
+      setFieldError(els.loginEmail, 'أدخل بريدك الإلكتروني أولًا لاستعادة كلمة المرور.');
+      els.loginEmail.focus();
+      return;
+    }
+
+    setButtonLoading(els.forgotBtn, true, 'جارٍ الإرسال...');
+
+    try {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}${window.location.pathname}`
+      });
+
+      if (error) {
+        reportSupabaseError(error, 'تعذر إرسال رابط استعادة كلمة المرور.');
+        return;
+      }
+
+      toast('إذا كان البريد مسجلًا، ستصلك رسالة لإعادة تعيين كلمة المرور.', 'info', 7000);
+    } catch (error) {
+      console.error(error);
+      toast('تعذر إرسال رابط استعادة كلمة المرور.', 'error');
+    } finally {
+      setButtonLoading(els.forgotBtn, false);
+    }
+  }
+
   /* ---------- الدخول إلى التطبيق ---------- */
 
-  function enterApp() {
-    if (!state.user) return;
+  async function enterApp(user) {
+    const mappedUser = mapUser(user);
+    if (!mappedUser) return;
+    if (state.user && state.user.id === mappedUser.id) return;
+
+    state.user = mappedUser;
+    state.notes = [];
+    state.notesLoading = true;
 
     els.authScreen.hidden = true;
     els.app.hidden = false;
-    document.title = `ملاحظاتي — ${state.user.name}`;
+    document.title = `ملاحظاتي — ${mappedUser.name}`;
 
     els.loginPassword.value = '';
     els.registerPassword.value = '';
@@ -824,6 +700,10 @@
     updateUserUI();
     renderAll();
     closeSidebar();
+
+    state.notes = await fetchNotes();
+    state.notesLoading = false;
+    renderAll();
   }
 
   function getStoredLayout() {
@@ -834,20 +714,36 @@
     }
   }
 
-  function logout() {
-    clearSession();
+  function resetToAuth() {
     state.user = null;
     state.notes = [];
+    state.notesLoading = false;
     state.query = '';
     state.view = 'all';
     state.editingId = null;
+    state.recoveryMode = false;
+    const currentPasswordField = els.currentPassword.closest('.field');
+    if (currentPasswordField) currentPasswordField.hidden = false;
     closeAllModals();
     els.loginForm.reset();
     els.registerForm.reset();
     updatePasswordStrength('');
     resetPasswordVisibility();
     showAuth();
-    toast('تم تسجيل الخروج بأمان.', 'info');
+  }
+
+  async function logout() {
+    const hadUser = Boolean(state.user);
+    state.user = null;
+
+    try {
+      if (supabaseClient) await supabaseClient.auth.signOut();
+    } catch (error) {
+      console.error('تعذر إنهاء جلسة Supabase:', error);
+    }
+
+    resetToAuth();
+    if (hadUser) toast('تم تسجيل الخروج بأمان.', 'info');
   }
 
   function updateUserUI() {
@@ -987,6 +883,22 @@
   function renderNotes() {
     if (!state.user) return;
 
+    if (state.notesLoading) {
+      els.notesGrid.hidden = true;
+      els.notesGrid.innerHTML = '';
+      els.emptyState.hidden = false;
+      els.emptyState.querySelector('use').setAttribute('href', '#i-database');
+      els.emptyTitle.textContent = 'جارٍ تحميل ملاحظاتك...';
+      els.emptyText.textContent = 'يتم جلب بياناتك بأمان من Supabase.';
+      els.emptyAction.hidden = true;
+      els.visibleCount.textContent = '…';
+      els.pageStat.querySelector('span').textContent = 'ملاحظة';
+      updateToolbar();
+      return;
+    }
+
+    els.emptyAction.hidden = false;
+
     const notes = getVisibleNotes();
     const hasNotes = notes.length > 0;
 
@@ -1092,19 +1004,9 @@
   function updateStorageMeter() {
     if (!state.user) return;
 
-    let bytes = 0;
-    try {
-      const serialized = JSON.stringify(state.notes);
-      bytes = typeof Blob === 'function'
-        ? new Blob([serialized]).size
-        : new TextEncoder().encode(serialized).length;
-    } catch (error) {
-      bytes = 0;
-    }
-
-    const percent = Math.min(100, (bytes / STORAGE_LIMIT) * 100);
-    els.storageBar.style.width = `${Math.max(percent, bytes > 0 ? 1.5 : 0)}%`;
-    els.storageText.textContent = formatBytes(bytes);
+    const count = state.notes.length;
+    els.storageText.textContent = count === 0 ? 'لا ملاحظات' : `${count} ${count === 1 ? 'ملاحظة' : 'ملاحظات'}`;
+    els.storageBar.style.width = count ? '100%' : '0%';
   }
 
   function updateSearchUI() {
@@ -1195,7 +1097,7 @@
     setTimeout(() => els.noteTitle.focus(), 60);
   }
 
-  function saveEditor() {
+  async function saveEditor() {
     if (!state.user) return;
 
     const title = els.noteTitle.value.trim();
@@ -1207,42 +1109,66 @@
       return;
     }
 
-    const now = Date.now();
+    if (!supabaseClient) {
+      toast('اتصال Supabase غير مهيأ.', 'error');
+      return;
+    }
 
-    if (state.editingId) {
-      const note = findNote(state.editingId);
-      if (!note) return;
-      note.title = title;
-      note.content = content;
-      note.color = state.editorColor;
-      note.pinned = state.editorPinned;
-      note.favorite = state.editorFavorite;
-      note.updatedAt = now;
-    } else {
-      state.notes.unshift({
-        id: uuid(),
+    setButtonLoading(els.saveNote, true, 'جارٍ الحفظ...');
+
+    try {
+      const payload = {
         title,
         content,
         color: state.editorColor,
         pinned: state.editorPinned,
-        favorite: state.editorFavorite,
-        trashed: false,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null
-      });
-      setActiveView('all');
-      state.query = '';
-      els.searchInput.value = '';
-      updateSearchUI();
+        favorite: state.editorFavorite
+      };
+
+      if (state.editingId) {
+        const { data, error } = await supabaseClient
+          .from('notes')
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq('id', state.editingId)
+          .eq('user_id', state.user.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        const index = state.notes.findIndex((note) => note.id === state.editingId);
+        if (index >= 0) state.notes[index] = mapNoteRow(data);
+        toast('تم حفظ التعديلات.', 'success');
+      } else {
+        const { data, error } = await supabaseClient
+          .from('notes')
+          .insert({
+            ...payload,
+            user_id: state.user.id,
+            trashed: false,
+            deleted_at: null
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        state.notes.unshift(mapNoteRow(data));
+        setActiveView('all');
+        state.query = '';
+        els.searchInput.value = '';
+        updateSearchUI();
+        toast('تمت إضافة الملاحظة.', 'success');
+      }
+
+      state.editorSnapshot = editorSnapshot();
+      closeModal(els.editorModal, false);
+      renderAll();
+    } catch (error) {
+      reportSupabaseError(error, 'تعذر حفظ الملاحظة.');
+    } finally {
+      setButtonLoading(els.saveNote, false);
     }
-
-    if (!persistNotes()) return;
-
-    state.editorSnapshot = editorSnapshot();
-    closeModal(els.editorModal, false);
-    renderAll();
-    toast(state.editingId ? 'تم حفظ التعديلات.' : 'تمت إضافة الملاحظة.', 'success');
   }
 
   function requestCloseEditor() {
@@ -1266,14 +1192,14 @@
       title: 'نقل الملاحظة إلى المهملات؟',
       message: 'يمكنك استعادة الملاحظة من المهملات قبل حذفها نهائيًا.',
       confirmText: 'نقل إلى المهملات',
-      onConfirm: () => {
-        note.trashed = true;
-        note.deletedAt = Date.now();
-        note.updatedAt = Date.now();
-        if (!persistNotes()) return;
-        closeModal(els.editorModal, false);
-        renderAll();
-        toast('تم نقل الملاحظة إلى المهملات.', 'info');
+      onConfirm: async () => {
+        const moved = await updateNoteRecord(
+          note.id,
+          { trashed: true, deleted_at: new Date().toISOString() },
+          'تم نقل الملاحظة إلى المهملات.',
+          'info'
+        );
+        if (moved) closeModal(els.editorModal, false);
       }
     });
   }
@@ -1288,12 +1214,16 @@
     els.currentPassword.value = '';
     els.newPassword.value = '';
     els.confirmPassword.value = '';
+
+    const currentPasswordField = els.currentPassword.closest('.field');
+    if (currentPasswordField) currentPasswordField.hidden = state.recoveryMode;
+
     updateThemeOptions();
     openModal(els.settingsModal);
     setTimeout(() => els.profileName.focus(), 60);
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     if (!state.user) return;
 
     const name = collapseSpaces(els.profileName.value);
@@ -1303,17 +1233,28 @@
       return;
     }
 
-    state.user.name = name;
-    const userIndex = state.users.findIndex((user) => user.id === state.user.id);
-    if (userIndex >= 0) state.users[userIndex] = { ...state.user };
-
-    if (!saveUsers()) {
-      toast('تعذر حفظ التغييرات على هذا الجهاز.', 'error');
+    if (!supabaseClient) {
+      toast('اتصال Supabase غير مهيأ.', 'error');
       return;
     }
 
-    updateUserUI();
-    toast('تم تحديث الملف الشخصي.', 'success');
+    setButtonLoading(els.saveProfile, true, 'جارٍ الحفظ...');
+
+    try {
+      const { data, error } = await supabaseClient.auth.updateUser({
+        data: { full_name: name }
+      });
+
+      if (error) throw error;
+
+      state.user = mapUser(data.user) || { ...state.user, name };
+      updateUserUI();
+      toast('تم تحديث الملف الشخصي.', 'success');
+    } catch (error) {
+      reportSupabaseError(error, 'تعذر تحديث الملف الشخصي.');
+    } finally {
+      setButtonLoading(els.saveProfile, false);
+    }
   }
 
   async function updatePassword() {
@@ -1323,7 +1264,7 @@
     const next = els.newPassword.value;
     const confirm = els.confirmPassword.value;
 
-    if (!current) {
+    if (!state.recoveryMode && !current) {
       toast('أدخل كلمة المرور الحالية أولًا.', 'error');
       els.currentPassword.focus();
       return;
@@ -1341,36 +1282,41 @@
       return;
     }
 
+    if (!supabaseClient) {
+      toast('اتصال Supabase غير مهيأ.', 'error');
+      return;
+    }
+
     setButtonLoading(els.updatePasswordBtn, true, 'جارٍ التحديث...');
 
     try {
-      const currentHash = await hashPassword(current, state.user.salt);
-      if (currentHash !== state.user.passwordHash) {
-        toast('كلمة المرور الحالية غير صحيحة.', 'error');
-        els.currentPassword.focus();
-        return;
+      if (!state.recoveryMode) {
+        // إعادة التحقق من كلمة المرور الحالية قبل تغييرها
+        const { error: authError } = await supabaseClient.auth.signInWithPassword({
+          email: state.user.email,
+          password: current
+        });
+
+        if (authError) {
+          toast('كلمة المرور الحالية غير صحيحة.', 'error');
+          els.currentPassword.focus();
+          return;
+        }
       }
 
-      const salt = randomHex(16);
-      const passwordHash = await hashPassword(next, salt);
-      state.user.salt = salt;
-      state.user.passwordHash = passwordHash;
+      const { error } = await supabaseClient.auth.updateUser({ password: next });
+      if (error) throw error;
 
-      const userIndex = state.users.findIndex((user) => user.id === state.user.id);
-      if (userIndex >= 0) state.users[userIndex] = { ...state.user };
-
-      if (!saveUsers()) {
-        toast('تعذر حفظ كلمة المرور على هذا الجهاز.', 'error');
-        return;
-      }
+      state.recoveryMode = false;
+      const currentPasswordField = els.currentPassword.closest('.field');
+      if (currentPasswordField) currentPasswordField.hidden = false;
 
       els.currentPassword.value = '';
       els.newPassword.value = '';
       els.confirmPassword.value = '';
       toast('تم تحديث كلمة المرور بنجاح.', 'success');
     } catch (error) {
-      console.error(error);
-      toast('حدث خطأ أثناء تحديث كلمة المرور.', 'error');
+      reportSupabaseError(error, 'حدث خطأ أثناء تحديث كلمة المرور.');
     } finally {
       setButtonLoading(els.updatePasswordBtn, false);
     }
@@ -1410,44 +1356,68 @@
   function deleteAllNotes() {
     confirmAction({
       title: 'حذف كل الملاحظات؟',
-      message: 'سيتم حذف جميع ملاحظاتك نهائيًا من هذا الجهاز. لا يمكن التراجع عن هذا الإجراء.',
+      message: 'سيتم حذف جميع ملاحظاتك نهائيًا من حسابك السحابي. لا يمكن التراجع عن هذا الإجراء.',
       confirmText: 'حذف الكل',
-      onConfirm: () => {
-        state.notes = [];
-        if (!persistNotes()) return;
-        renderAll();
-        toast('تم حذف جميع الملاحظات.', 'info');
+      onConfirm: async () => {
+        if (!supabaseClient || !state.user) {
+          toast('اتصال Supabase غير مهيأ.', 'error');
+          return;
+        }
+
+        try {
+          const { error } = await supabaseClient
+            .from('notes')
+            .delete()
+            .eq('user_id', state.user.id);
+
+          if (error) {
+            reportSupabaseError(error, 'تعذر حذف الملاحظات.');
+            return;
+          }
+
+          state.notes = [];
+          renderAll();
+          toast('تم حذف جميع الملاحظات.', 'info');
+        } catch (error) {
+          reportSupabaseError(error, 'تعذر حذف الملاحظات.');
+        }
       }
     });
   }
 
   function deleteAccount() {
     if (!state.user) return;
-    const userId = state.user.id;
     const email = state.user.email;
 
     confirmAction({
       title: 'حذف الحساب نهائيًا؟',
-      message: `سيتم حذف حساب «${email}» وجميع ملاحظاته من هذا الجهاز نهائيًا. لا يمكن التراجع.`,
+      message: `سيتم حذف حساب «${email}» وجميع ملاحظاته نهائيًا من Supabase. لا يمكن التراجع.`,
       confirmText: 'حذف حسابي',
-      onConfirm: () => {
-        try {
-          localStorage.removeItem(getNotesKey(userId));
-        } catch (error) {
-          // تجاهل
+      onConfirm: async () => {
+        if (!supabaseClient) {
+          toast('اتصال Supabase غير مهيأ.', 'error');
+          return;
         }
 
-        state.users = state.users.filter((user) => user.id !== userId);
-        saveUsers();
-        clearSession();
-        state.user = null;
-        state.notes = [];
-        closeModal(els.settingsModal, false);
-        els.loginForm.reset();
-        els.registerForm.reset();
-        updatePasswordStrength('');
-        showAuth();
-        toast('تم حذف حسابك وكل ملاحظاته.', 'info', 4500);
+        setButtonLoading(els.deleteAccount, true, 'جارٍ الحذف...');
+
+        try {
+          const { error } = await supabaseClient.rpc('delete_my_account');
+          if (error) throw error;
+
+          try {
+            await supabaseClient.auth.signOut();
+          } catch (signOutError) {
+            console.warn('تعذر إنهاء الجلسة بعد حذف الحساب:', signOutError);
+          }
+
+          resetToAuth();
+          toast('تم حذف حسابك وكل ملاحظاته.', 'info', 4500);
+        } catch (error) {
+          reportSupabaseError(error, 'تعذر حذف الحساب. تأكد من تنفيذ دالة delete_my_account في Supabase.');
+        } finally {
+          setButtonLoading(els.deleteAccount, false);
+        }
       }
     });
   }
@@ -1555,7 +1525,6 @@
       registerAlert: $('#registerAlert'),
       loginEmail: $('#loginEmail'),
       loginPassword: $('#loginPassword'),
-      rememberMe: $('#rememberMe'),
       loginSubmit: $('#loginSubmit'),
       registerName: $('#registerName'),
       registerEmail: $('#registerEmail'),
@@ -1671,9 +1640,7 @@
       updatePasswordStrength(els.registerPassword.value);
     });
 
-    els.forgotBtn.addEventListener('click', () => {
-      toast('لأن البيانات محفوظة محليًا، لا توجد خدمة بريد لاستعادة كلمة المرور. يمكنك إنشاء حساب جديد أو استخدام كلمة المرور التي تتذكرها.', 'info', 7000);
-    });
+    els.forgotBtn.addEventListener('click', handleForgotPassword);
 
     /* التنقل */
     $$('[data-view]').forEach((button) => {
@@ -1736,7 +1703,7 @@
       else openEditor();
     });
 
-    els.notesGrid.addEventListener('click', (event) => {
+    els.notesGrid.addEventListener('click', async (event) => {
       const card = event.target.closest('.note-card');
       if (!card) return;
 
@@ -1749,43 +1716,38 @@
         if (!note) return;
 
         if (action === 'pin') {
-          note.pinned = !note.pinned;
-          if (persistNotes()) {
-            renderAll();
-            toast(note.pinned ? 'تم تثبيت الملاحظة.' : 'تم إلغاء تثبيت الملاحظة.', 'success', 2400);
-          }
+          await updateNoteRecord(
+            note.id,
+            { pinned: !note.pinned },
+            note.pinned ? 'تم إلغاء تثبيت الملاحظة.' : 'تم تثبيت الملاحظة.'
+          );
         } else if (action === 'favorite') {
-          note.favorite = !note.favorite;
-          if (persistNotes()) {
-            renderAll();
-            toast(note.favorite ? 'أُضيفت الملاحظة إلى المفضلة.' : 'أُزيلت الملاحظة من المفضلة.', 'success', 2400);
-          }
+          await updateNoteRecord(
+            note.id,
+            { favorite: !note.favorite },
+            note.favorite ? 'أُزيلت الملاحظة من المفضلة.' : 'أُضيفت الملاحظة إلى المفضلة.'
+          );
         } else if (action === 'trash') {
-          note.trashed = true;
-          note.deletedAt = Date.now();
-          note.updatedAt = Date.now();
-          if (persistNotes()) {
-            renderAll();
-            toast('تم نقل الملاحظة إلى المهملات.', 'info');
-          }
+          await updateNoteRecord(
+            note.id,
+            { trashed: true, deleted_at: new Date().toISOString() },
+            'تم نقل الملاحظة إلى المهملات.',
+            'info'
+          );
         } else if (action === 'restore') {
-          note.trashed = false;
-          note.deletedAt = null;
-          note.updatedAt = Date.now();
-          if (persistNotes()) {
-            renderAll();
-            toast('تمت استعادة الملاحظة.', 'success');
-          }
+          await updateNoteRecord(
+            note.id,
+            { trashed: false, deleted_at: null },
+            'تمت استعادة الملاحظة.'
+          );
         } else if (action === 'purge') {
           confirmAction({
             title: 'حذف الملاحظة نهائيًا؟',
             message: 'لن تتمكن من استعادة هذه الملاحظة بعد حذفها نهائيًا.',
             confirmText: 'حذف نهائي',
-            onConfirm: () => {
-              state.notes = state.notes.filter((noteItem) => noteItem.id !== noteId);
-              if (!persistNotes()) return;
-              renderAll();
-              toast('تم حذف الملاحظة نهائيًا.', 'info');
+            onConfirm: async () => {
+              const deleted = await deleteNoteRecord(noteId);
+              if (deleted) toast('تم حذف الملاحظة نهائيًا.', 'info');
             }
           });
         }
@@ -1812,11 +1774,30 @@
         title: 'إفراغ المهملات؟',
         message: `سيتم حذف ${trashCount} ${trashCount === 1 ? 'ملاحظة' : 'ملاحظات'} نهائيًا. لا يمكن التراجع عن هذا الإجراء.`,
         confirmText: 'إفراغ المهملات',
-        onConfirm: () => {
-          state.notes = state.notes.filter((note) => !note.trashed);
-          if (!persistNotes()) return;
-          renderAll();
-          toast('تم إفراغ المهملات.', 'info');
+        onConfirm: async () => {
+          if (!supabaseClient || !state.user) {
+            toast('اتصال Supabase غير مهيأ.', 'error');
+            return;
+          }
+
+          try {
+            const { error } = await supabaseClient
+              .from('notes')
+              .delete()
+              .eq('user_id', state.user.id)
+              .eq('trashed', true);
+
+            if (error) {
+              reportSupabaseError(error, 'تعذر إفراغ المهملات.');
+              return;
+            }
+
+            state.notes = state.notes.filter((note) => !note.trashed);
+            renderAll();
+            toast('تم إفراغ المهملات.', 'info');
+          } catch (error) {
+            reportSupabaseError(error, 'تعذر إفراغ المهملات.');
+          }
         }
       });
     });
@@ -1931,27 +1912,6 @@
       if (event.key === 'Tab') trapFocus(event);
     });
 
-    /* المزامنة بين التبويبات */
-    window.addEventListener('storage', (event) => {
-      if (!state.user) {
-        if (event.key === STORAGE.users) loadUsers();
-        return;
-      }
-
-      if (event.key === STORAGE.users) {
-        loadUsers();
-        const current = state.users.find((user) => user.id === state.user.id);
-        if (current) {
-          state.user = current;
-          updateUserUI();
-        }
-      }
-
-      if (event.key === getNotesKey(state.user.id) && els.editorModal.hidden) {
-        state.notes = loadNotes(state.user.id);
-        renderAll();
-      }
-    });
   }
 
   function trapFocus(event) {
@@ -1978,25 +1938,77 @@
 
   /* ---------- الإقلاع ---------- */
 
-  function init() {
+  function handleAuthStateChange(event, session) {
+    if (event === 'SIGNED_OUT') {
+      if (state.user) {
+        resetToAuth();
+        toast('تم تسجيل الخروج.', 'info');
+      }
+      return;
+    }
+
+    if (event === 'SIGNED_IN' && session && session.user && !state.user) {
+      setTimeout(() => {
+        enterApp(session.user).catch((error) => {
+          console.error(error);
+          toast('تعذر تحميل مساحتك.', 'error');
+        });
+      }, 0);
+    }
+
+    if (event === 'PASSWORD_RECOVERY' && session && session.user) {
+      state.recoveryMode = true;
+      setTimeout(async () => {
+        try {
+          if (!state.user) await enterApp(session.user);
+          openSettings();
+          toast('أدخل كلمة مرور جديدة ثم اضغط تحديث كلمة المرور.', 'info', 6500);
+          els.newPassword.focus();
+        } catch (error) {
+          console.error(error);
+          toast('تعذر فتح إعدادات استعادة كلمة المرور.', 'error');
+        }
+      }, 0);
+    }
+  }
+
+  async function init() {
     cacheDom();
     bindEvents();
 
     state.theme = getStoredTheme();
     applyTheme(state.theme, false);
-    loadUsers();
     updatePasswordStrength('');
 
-    const session = readSession();
-    if (session) {
-      const user = state.users.find((item) => item.id === session.userId);
-      if (user) {
-        state.user = user;
-        state.notes = loadNotes(user.id);
-        enterApp();
+    if (!window.supabase) {
+      showAuth();
+      showAlert(els.loginAlert, 'تعذر تحميل مكتبة Supabase. تحقق من اتصال الإنترنت ثم أعد تحميل الصفحة.');
+      els.loginSubmit.disabled = true;
+      els.registerSubmit.disabled = true;
+      els.forgotBtn.disabled = true;
+      return;
+    }
+
+    if (!supabaseClient) {
+      showAuth();
+      showAlert(els.loginAlert, 'اتصال Supabase غير مهيأ. أضف Project URL والمفتاح العام anon في ملف supabase-config.js.');
+      els.loginSubmit.disabled = true;
+      els.registerSubmit.disabled = true;
+      els.forgotBtn.disabled = true;
+      return;
+    }
+
+    supabaseClient.auth.onAuthStateChange(handleAuthStateChange);
+
+    try {
+      const { data, error } = await supabaseClient.auth.getSession();
+      if (error) throw error;
+      if (data.session && data.session.user) {
+        await enterApp(data.session.user);
         return;
       }
-      clearSession();
+    } catch (error) {
+      console.error('تعذر قراءة جلسة Supabase:', error);
     }
 
     showAuth();

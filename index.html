@@ -84,7 +84,7 @@
           </li>
           <li>
             <span class="feature-icon"><svg class="icon"><use href="#i-database"/></svg></span>
-            <span><strong>بياناتك على جهازك</strong><small>تُحفظ محليًا في متصفحك، دون إرسالها إلى أي خادم.</small></span>
+            <span><strong>مزامنة آمنة</strong><small>ملاحظاتك محفوظة في حسابك السحابي عبر Supabase، وتصلك أينما سجّلت الدخول.</small></span>
           </li>
           <li>
             <span class="feature-icon"><svg class="icon"><use href="#i-sparkles"/></svg></span>
@@ -162,12 +162,7 @@
             <span class="field-error" data-error-for="loginPassword"></span>
           </label>
 
-          <div class="auth-row">
-            <label class="checkbox">
-              <input type="checkbox" id="rememberMe" checked>
-              <span class="checkbox-box"><svg class="icon"><use href="#i-check"/></svg></span>
-              <span>تذكرني على هذا الجهاز</span>
-            </label>
+          <div class="auth-row auth-row--end">
             <button class="link-btn" type="button" id="forgotBtn">نسيت كلمة المرور؟</button>
           </div>
 
@@ -231,12 +226,12 @@
             <svg class="icon"><use href="#i-arrow-left"/></svg>
           </button>
 
-          <p class="auth-fineprint">بالمتابعة، تُحفظ بياناتك محليًا على هذا الجهاز فقط. يمكنك حذف حسابك وبياناتك في أي وقت من الإعدادات.</p>
+          <p class="auth-fineprint">بالمتابعة، تُحفظ ملاحظاتك في حسابك السحابي المحمي عبر Supabase. يمكنك حذف حسابك وبياناتك في أي وقت من الإعدادات.</p>
         </form>
 
         <div class="auth-trust">
           <svg class="icon"><use href="#i-lock"/></svg>
-          <span>بياناتك تبقى على هذا الجهاز — لا يتم إرسال أي شيء إلى الإنترنت.</span>
+          <span>دخول آمن وحماية صفوف (RLS) — كل مستخدم يرى ملاحظاته فقط.</span>
         </div>
       </div>
     </div>
@@ -284,11 +279,11 @@
 
       <div class="sidebar-storage">
         <div class="storage-head">
-          <span>التخزين المحلي</span>
-          <span id="storageText">0 ك.ب</span>
+          <span>الملاحظات السحابية</span>
+          <span id="storageText">لا ملاحظات</span>
         </div>
         <div class="storage-bar"><span id="storageBar"></span></div>
-        <p>ملاحظاتك محفوظة في هذا المتصفح فقط.</p>
+        <p>محفوظة بأمان في حسابك عبر Supabase.</p>
       </div>
 
       <div class="sidebar-user">
@@ -547,13 +542,13 @@
               <span>حذف كل الملاحظات</span>
             </button>
           </div>
-          <p class="settings-note"><svg class="icon"><use href="#i-info"/></svg> يتم تصدير الملاحظات كملف JSON يمكنك الاحتفاظ به.</p>
+          <p class="settings-note"><svg class="icon"><use href="#i-info"/></svg> ملاحظاتك محفوظة في حسابك السحابي. يتم تصديرها كملف JSON يمكنك الاحتفاظ به.</p>
         </section>
 
         <section class="settings-section settings-section--danger">
           <div class="settings-section-head">
             <span class="settings-icon"><svg class="icon"><use href="#i-alert"/></svg></span>
-            <div><h3>حذف الحساب</h3><p>حذف حسابك وكل ملاحظاتك نهائيًا من هذا الجهاز.</p></div>
+            <div><h3>حذف الحساب</h3><p>حذف حسابك وكل ملاحظاتك نهائيًا من خدمة Supabase.</p></div>
           </div>
           <button class="btn btn-danger btn-sm" type="button" id="deleteAccount">حذف حسابي نهائيًا</button>
         </section>
@@ -576,6 +571,8 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
